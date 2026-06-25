@@ -1,6 +1,6 @@
 {
   "created_at": "2026-06-25T18:15:34.316321Z",
-  "updated_at": "2026-06-25T19:11:06.559926Z",
+  "updated_at": "2026-06-25T19:11:58.204085Z",
   "created_by": "admin",
   "updated_by": "terry@cleverbits.io",
   "is_deleted": false,
@@ -21,80 +21,11 @@
   "bh_github_username": "terry",
   "pipeline_json": {
     "name": "terry_transformer_test",
-    "description": "",
+    "description": " ",
     "version": "1.0.0",
     "engine_type": "pyspark",
     "mode": "ENGINE",
-    "parameters": [
-      {
-        "key": "sfUser",
-        "value": "sf_user"
-      },
-      {
-        "key": "sfPassword",
-        "value": "sf_password"
-      },
-      {
-        "key": "sfDatabase",
-        "value": "ENT_PRD"
-      },
-      {
-        "key": "sfRole",
-        "value": "FSA_DEV_FRAUD_ACC_FULL"
-      },
-      {
-        "key": "sfSchema",
-        "value": "TIER1_PRS"
-      },
-      {
-        "key": "sfWarehouse",
-        "value": "FSA_DEV_FRAUD_QUERY"
-      },
-      {
-        "key": "sfURL",
-        "value": "test_url"
-      },
-      {
-        "key": "sfJDBCURL",
-        "value": "jdbc:snowflake://natwestgroup.eu-west-1.privatelink.snowflakecomputing.com/"
-      },
-      {
-        "key": "sfTargetTable",
-        "value": "EVENT_FINANCIAL_MTA"
-      },
-      {
-        "key": "fileWriteFormat",
-        "value": "parquet"
-      },
-      {
-        "key": "S3fileWriteMode",
-        "value": "overwrite"
-      },
-      {
-        "key": "jdbcReadParallelism",
-        "value": "1"
-      },
-      {
-        "key": "bucket",
-        "value": "test"
-      },
-      {
-        "key": "bucketPath",
-        "value": "bde/fraud/hvs/model_inference_bb/"
-      },
-      {
-        "key": "hist_execution_date",
-        "value": "2023-02-02"
-      },
-      {
-        "key": "reportingLag",
-        "value": "1"
-      },
-      {
-        "key": "use_hist_execution_date",
-        "value": "Y"
-      }
-    ],
+    "parameters": [],
     "connections": {
       "snowflake_conn": {
         "name": "snowflake_conn",
@@ -104,6 +35,26 @@
         "role": "FSA_DEV_FRAUD_ACC_FULL",
         "database": "ENT_PRD",
         "schema": "TIER1_PRS"
+      },
+      "Dev_Random_1": {
+        "name": "Dev_Random_1",
+        "connection_type": "Snowflake",
+        "connection_config_id": "snowflake_conn",
+        "account": "natwestgroup.eu-west-1.privatelink.snowflakecomputing.com",
+        "warehouse": "FSA_DEV_FRAUD_QUERY",
+        "database": "ENT_PRD",
+        "schema": "TIER1_PRS",
+        "role": "FSA_DEV_FRAUD_ACC_FULL"
+      },
+      "Trash_2": {
+        "name": "snowflake_conn",
+        "connection_type": "Snowflake",
+        "connection_config_id": "snowflake_conn",
+        "account": "natwestgroup.eu-west-1.privatelink.snowflakecomputing.com",
+        "warehouse": "FSA_DEV_FRAUD_QUERY",
+        "database": "ENT_PRD",
+        "schema": "TIER1_PRS",
+        "role": "FSA_DEV_FRAUD_ACC_FULL"
       }
     },
     "sources": {
@@ -112,8 +63,9 @@
         "source_type": "Relational",
         "table_name": "Dev_Random_1",
         "connection": {
-          "$ref": "#/connections/snowflake_conn"
-        }
+          "$ref": "#/connections/Dev_Random_1"
+        },
+        "schema_name": "TIER1_PRS"
       }
     },
     "targets": {
@@ -123,8 +75,9 @@
         "table_name": "Trash_2",
         "load_mode": "overwrite",
         "connection": {
-          "$ref": "#/connections/snowflake_conn"
-        }
+          "$ref": "#/connections/Trash_2"
+        },
+        "schema_name": ""
       }
     },
     "transformations": [
@@ -135,7 +88,10 @@
         "source": {
           "$ref": "#/sources/Dev_Random_1"
         },
-        "description": "Placeholder Reader for StreamSets dev origin 'com_streamsets_pipeline_spark_origin_dev_DevRandomDOrigin'. Replace with the real source/query."
+        "description": "Placeholder Reader for StreamSets dev origin 'com_streamsets_pipeline_spark_origin_dev_DevRandomDOrigin'. Replace with the real source/query.",
+        "read_options": {
+          "header": true
+        }
       },
       {
         "name": "Get_Agreements",
@@ -154,7 +110,12 @@
         "target": {
           "$ref": "#/targets/Trash_2"
         },
-        "description": "Placeholder Writer for StreamSets null/trash destination 'com_streamsets_pipeline_spark_destination_dev_NullDTarget'. Replace with the real target."
+        "description": "Placeholder Writer for StreamSets null/trash destination 'com_streamsets_pipeline_spark_destination_dev_NullDTarget'. Replace with the real target.",
+        "file_name": "output.csv",
+        "write_options": {
+          "header": true,
+          "sep": ","
+        }
       }
     ],
     "engine_config": {
@@ -280,7 +241,8 @@
         "clusterConfig.dataCacheLevel": "MEMORY_AND_DISK",
         "clusterConfig.dataCacheReplicas": 1
       }
-    }
+    },
+    "$schema": "https://json-schema.org/draft-07/schema#"
   },
   "pipeline_type": "design",
   "engine_type": "pyspark",
