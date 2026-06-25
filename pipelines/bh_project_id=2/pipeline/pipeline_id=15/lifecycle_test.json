@@ -1,0 +1,725 @@
+{
+  "created_at": "2026-06-25T21:23:25.710142Z",
+  "updated_at": "2026-06-25T21:23:25.710142Z",
+  "created_by": "admin",
+  "updated_by": "admin",
+  "is_deleted": false,
+  "deleted_by": null,
+  "tenant_id": 1,
+  "pipeline_id": 15,
+  "pipeline_name": "lifecycle_test",
+  "pipeline_key": "lifecycle_test",
+  "bh_project_id": 2,
+  "notes": null,
+  "tags": null,
+  "status": "active",
+  "pipeline_version_id": null,
+  "bh_project_name": "test",
+  "bh_github_username": "cleverbitsio",
+  "pipeline_json": {
+    "name": "terry_transformer_test",
+    "description": "",
+    "version": "1.0.0",
+    "engine_type": "pyspark",
+    "mode": "ENGINE",
+    "parameters": [
+      {
+        "key": "sfUser",
+        "value": "sf_user"
+      },
+      {
+        "key": "sfPassword",
+        "value": "sf_password"
+      },
+      {
+        "key": "sfDatabase",
+        "value": "ENT_PRD"
+      },
+      {
+        "key": "sfRole",
+        "value": "FSA_DEV_FRAUD_ACC_FULL"
+      },
+      {
+        "key": "sfSchema",
+        "value": "TIER1_PRS"
+      },
+      {
+        "key": "sfWarehouse",
+        "value": "FSA_DEV_FRAUD_QUERY"
+      },
+      {
+        "key": "sfURL",
+        "value": "test_url"
+      },
+      {
+        "key": "sfJDBCURL",
+        "value": "jdbc:snowflake://natwestgroup.eu-west-1.privatelink.snowflakecomputing.com/"
+      },
+      {
+        "key": "sfTargetTable",
+        "value": "EVENT_FINANCIAL_MTA"
+      },
+      {
+        "key": "fileWriteFormat",
+        "value": "parquet"
+      },
+      {
+        "key": "S3fileWriteMode",
+        "value": "overwrite"
+      },
+      {
+        "key": "jdbcReadParallelism",
+        "value": "1"
+      },
+      {
+        "key": "bucket",
+        "value": "test"
+      },
+      {
+        "key": "bucketPath",
+        "value": "bde/fraud/hvs/model_inference_bb/"
+      },
+      {
+        "key": "hist_execution_date",
+        "value": "2023-02-02"
+      },
+      {
+        "key": "reportingLag",
+        "value": "1"
+      },
+      {
+        "key": "use_hist_execution_date",
+        "value": "Y"
+      }
+    ],
+    "connections": {
+      "snowflake_conn": {
+        "name": "snowflake_conn",
+        "connection_type": "Snowflake",
+        "host": "natwestgroup.eu-west-1.privatelink.snowflakecomputing.com",
+        "warehouse": "FSA_DEV_FRAUD_QUERY",
+        "role": "FSA_DEV_FRAUD_ACC_FULL",
+        "database": "ENT_PRD",
+        "schema": "TIER1_PRS"
+      }
+    },
+    "sources": {
+      "Dev_Random_1": {
+        "name": "Dev_Random_1",
+        "source_type": "Relational",
+        "table_name": "Dev_Random_1",
+        "connection": {
+          "$ref": "#/connections/snowflake_conn"
+        }
+      }
+    },
+    "targets": {
+      "Trash_2": {
+        "name": "Trash_2",
+        "target_type": "Relational",
+        "table_name": "Trash_2",
+        "load_mode": "overwrite",
+        "connection": {
+          "$ref": "#/connections/snowflake_conn"
+        }
+      }
+    },
+    "transformations": [
+      {
+        "name": "Dev_Random_1",
+        "transformation": "Reader",
+        "dependent_on": [],
+        "source": {
+          "$ref": "#/sources/Dev_Random_1"
+        },
+        "description": "Placeholder Reader for StreamSets dev origin 'com_streamsets_pipeline_spark_origin_dev_DevRandomDOrigin'. Replace with the real source/query."
+      },
+      {
+        "name": "Get_Agreements",
+        "transformation": "Python",
+        "dependent_on": [
+          "Dev_Random_1"
+        ],
+        "user_code": "import pyspark.sql.functions as f \nimport os\nimport sys\nimport pytest\n\nfrom datetime import datetime\nfrom functools import reduce\n\nfrom pyspark.sql import DataFrame\nfrom pyspark.sql.functions import coalesce, col, datediff, lag, lit, lower, udf, broadcast, date_add, expr,regexp_replace,concat,count \nfrom pyspark.sql.types import StructType,StructField, StringType, IntegerType\nfrom datetime import datetime, date, timedelta\n\ndef calculate_hvs_execution_date(hist_execution_date_str, use_hist_execution_date, reportingLag):\n    \n    if hist_execution_date_str == None:\n        hist_execution_date_str = ''\n    if use_hist_execution_date == None:\n        use_hist_execution_date = 'N'  \n    if use_hist_execution_date == '':\n        use_hist_execution_date = 'N'         \n        \n    if use_hist_execution_date == \"Y\" and (hist_execution_date_str != ''):\n        hist_execution_date = datetime.strptime(hist_execution_date_str, \"%Y-%m-%d\")\n        if reportingLag == 2 and hist_execution_date.weekday() in (0,1):\n            return f\"'{(hist_execution_date + timedelta(-2-reportingLag)).strftime('%Y-%m-%d')}'\"\n        elif reportingLag == 2 and hist_execution_date.weekday() not in (0,1):\n            return f\"'{(hist_execution_date + timedelta(-reportingLag)).strftime('%Y-%m-%d')}'\"\n        elif reportingLag == 1 and hist_execution_date.weekday() == 0:\n            return f\"'{(hist_execution_date + timedelta(-2-reportingLag)).strftime('%Y-%m-%d')}'\"   \n        elif reportingLag == 1 and hist_execution_date.weekday() != 0:\n            return f\"'{(hist_execution_date + timedelta(-reportingLag)).strftime('%Y-%m-%d')}'\"               \n        else:\n            return f\"'{(hist_execution_date + timedelta(-reportingLag)).strftime('%Y-%m-%d')}'\"\n    else:\n        current_date = datetime.now()\n        if reportingLag == 2 and current_date.weekday() in (0,1):\n            return f\"'{(current_date + timedelta(-2-reportingLag)).strftime('%Y-%m-%d')}'\"\n        elif reportingLag == 2 and current_date.weekday() not in (0,1):\n            return f\"'{(current_date + timedelta(-reportingLag)).strftime('%Y-%m-%d')}'\"\n        elif reportingLag == 1 and current_date.weekday() == 0:\n            return f\"'{(current_date + timedelta(-2-reportingLag)).strftime('%Y-%m-%d')}'\"   \n        elif reportingLag == 1 and current_date.weekday() != 0:\n            return f\"'{(current_date + timedelta(-reportingLag)).strftime('%Y-%m-%d')}'\"           \n        else:\n            return f\"'{(current_date + timedelta(-reportingLag)).strftime('%Y-%m-%d')}'\"\n\n\nhist_execution_date = f\"${hist_execution_date}\"\nuse_hist_execution_date = f\"${use_hist_execution_date}\"\nreportingLag = ${reportingLag}\n\nexecution_date = calculate_hvs_execution_date(hist_execution_date,use_hist_execution_date,reportingLag)\n\n######Uncomment This Once you gain access on S3 PROD and comment the Snowflake Source\n#financial_posting_ss_v_df = spark.read.parquet(\"s3://datalake-prod-processed-s3/eas/bdp_eas/FINANCIAL_POSTING/\").where(f\"  edi_business_day = {execution_date} AND edi_business_day IS NOT NULL \")\n#financial_posting_ss_v_df = financial_posting_ss_v_df.select(\"agrmnt_id_bal_acct\",\"fin_evnt_pstd_dt\",\"agrmnt_sbtyp_cd\",\"edi_business_day\").repartition(200)\n#financial_posting_ss_v_df.createOrReplaceTempView(\"financial_posting_ss_v\")\n\n#read_financial_posting_table = spark.sql(f\"\"\" SELECT DISTINCT fp.agrmnt_id_bal_acct,fp.edi_business_day FROM financial_posting_ss_v fp WHERE fp.edi_business_day = {execution_date} AND fp.agrmnt_sbtyp_cd='MTA' \"\"\")\n\n# queryString= f\"\"\" SELECT DISTINCT fp.agrmnt_id_bal_acct,fp.fin_evnt_pstd_dt as edi_business_day,(ROW_NUMBER() OVER(PARTITION BY NULL ORDER BY NULL))%${jdbcReadParallelism} rnumModPartition FROM ${sfDatabase}.${sfSchema}.${sfTargetTable} fp \n# INNER join ENT_PRD.TIER1_PRS.AGREEMENT agr on fp.agrmnt_id_bal_acct=agr.agrmnt_id\n# INNER join ENT_PRD.TIER1_PRS.CUSTOMER_ACCOUNT cust_acct on trim(cast(agr.AGRMNT_ACCT_NUM as string))=trim(cast(cust_acct.account_no as string)) and trim(cast(agr.AGRMNT_BRNCH_NUM as string))=trim(cast(cust_acct.branch_no as string))\n# INNER join ENT_PRD.TIER1_PRS.CUSTOMER cust on trim(cast(cust.customer_id as string))=trim(cast(cust_acct.customer_id as string)) and relation_type='OWN'\n# INNER join ENT_PRD.TIER1_PRS.ORG_MODEL_HIER ORG on cust.PORTFOLIO_CODE=ORG.PFOLIO and DIRPOSNAME2 = 'MD BUSINESS BANKING'\n# WHERE fp.fin_evnt_pstd_dt = {execution_date} \"\"\"\n\nqueryString= f\"\"\" SELECT fp.agrmnt_id_bal_acct,fp.fin_evnt_pstd_dt as edi_business_day,\ncust_acct.customer_id,(ROW_NUMBER() OVER(PARTITION BY NULL ORDER BY NULL))%${jdbcReadParallelism} rnumModPartition\nFROM ${sfDatabase}.${sfSchema}.${sfTargetTable} fp \nINNER join ENT_PRD.TIER1_PRS.AGREEMENT agr on fp.agrmnt_id_bal_acct=agr.agrmnt_id\nINNER join ENT_PRD.TIER1_PRS.CUSTOMER_ACCOUNT cust_acct on cast(trim(agr.AGRMNT_ACCT_NUM) as int)=cast(trim(cust_acct.account_no) as int) and cast(trim(agr.AGRMNT_BRNCH_NUM) as int)=cast(trim(cust_acct.branch_no) as int)\nWHERE fp.fin_evnt_pstd_dt = {execution_date}\nAND cust_acct.relation_type IN('OWN','OWJ')\nAND RLIKE(TRIM(CASE WHEN NVL(agr.AGRMNT_ACCT_NUM,'') = '' THEN '99999999' WHEN agr.AGRMNT_ACCT_NUM = '' THEN '99999999' ELSE agr.AGRMNT_ACCT_NUM END), '^[0-9]+')\nAND  RLIKE(TRIM(CASE WHEN NVL(agr.AGRMNT_BRNCH_NUM,'') = '' THEN '99999999' WHEN agr.AGRMNT_BRNCH_NUM = '' THEN '99999999' ELSE agr.AGRMNT_BRNCH_NUM END), '^[0-9]+') \"\"\"\n\nread_bb_base_data_df  = spark.read.format(\"jdbc\")\\\n                                    .option(\"user\", \"${sfUser}\")\\\n                                    .option(\"password\",\"${sfPassword}\")\\\n                                    .option(\"db\", \"${sfDatabase}\")\\\n                                    .option(\"role\", \"${sfRole}\")\\\n                                    .option(\"schema\", \"${sfSchema}\")\\\n                                    .option(\"warehouse\", \"${sfWarehouse}\")\\\n                                    .option(\"driver\", \"com.snowflake.client.jdbc.SnowflakeDriver\")\\\n                                    .option(\"url\", \"${sfJDBCURL}\")\\\n                                    .option(\"dbtable\", f\" ( {queryString} ) tbl \")\\\n                                    .option(\"partitionColumn\", \"rnumModPartition\")\\\n                                    .option(\"lowerBound\", \"0\")\\\n                                    .option(\"upperBound\", \"${jdbcReadParallelism}\")\\\n                                    .option(\"numPartitions\", \"${jdbcReadParallelism}\")\\\n                                    .option(\"fetchsize\", \"1000\")\\\n                                    .load()\n\nbucket           = \"${bucket}\"\npath             = \"${bucketPath}\" + \"hvs_infer_agreement_ids_intermediate/\"\nfull_bucket_path = bucket+path\n\nread_bb_base_data_df.drop(\"rnumModPartition\").distinct().repartition(200).write.mode(\"overwrite\").format(\"parquet\").save(full_bucket_path)\n\nread_bb_base_data_df = spark.read.parquet(full_bucket_path)\n\nqueryString= f\"\"\" SELECT cust.customer_id,(ROW_NUMBER() OVER(PARTITION BY NULL ORDER BY NULL))%${jdbcReadParallelism} rnumModPartition FROM ENT_PRD.TIER1_PRS.CUSTOMER cust INNER JOIN ENT_PRD.TIER1_PRS.CUSTOMER_ACCOUNT cust_acct ON(cust.customer_id = cust_acct.customer_id AND cust_acct.relation_type='OWN')\nINNER join ENT_PRD.TIER1_PRS.ORG_MODEL_HIER ORG on cust.PORTFOLIO_CODE=ORG.PFOLIO and DIRPOSNAME2 = 'MD BUSINESS BANKING' \"\"\"\n\nread_bb_customer_df = spark.read.format(\"jdbc\")\\\n                                    .option(\"user\", \"${sfUser}\")\\\n                                    .option(\"password\",\"${sfPassword}\")\\\n                                    .option(\"db\", \"${sfDatabase}\")\\\n                                    .option(\"role\", \"${sfRole}\")\\\n                                    .option(\"schema\", \"${sfSchema}\")\\\n                                    .option(\"warehouse\", \"${sfWarehouse}\")\\\n                                    .option(\"driver\", \"com.snowflake.client.jdbc.SnowflakeDriver\")\\\n                                    .option(\"url\", \"${sfJDBCURL}\")\\\n                                    .option(\"dbtable\", f\" ( {queryString} ) tbl \")\\\n                                    .option(\"partitionColumn\", \"rnumModPartition\")\\\n                                    .option(\"lowerBound\", \"0\")\\\n                                    .option(\"upperBound\", \"${jdbcReadParallelism}\")\\\n                                    .option(\"numPartitions\", \"${jdbcReadParallelism}\")\\\n                                    .option(\"fetchsize\", \"1000\")\\\n                                    .load()\n\nread_bb_customer_df = read_bb_customer_df.drop(\"rnumModPartition\").distinct()\n\nread_bb_base_data_df.createOrReplaceTempView(\"BizBankBaseData\");\nread_bb_customer_df.createOrReplaceTempView(\"BizBankCustomerData\");\n\nread_financial_posting_table = spark.sql(f\"\"\" SELECT /*+ BROADCAST(cust) */\t cust_acct.agrmnt_id_bal_acct, cust_acct.edi_business_day,(ROW_NUMBER() OVER(PARTITION BY NULL ORDER BY NULL))%${jdbcReadParallelism} rnumModPartition FROM BizBankBaseData cust_acct INNER JOIN BizBankCustomerData cust ON(cust.customer_id=cust_acct.customer_id) \"\"\")\n\nread_financial_posting_table = read_financial_posting_table.drop(\"rnumModPartition\").distinct()\n\nbucket           = \"${bucket}\"\npath             = \"${bucketPath}\" + \"hvs_infer_agreement_ids/\"\nfull_bucket_path = bucket+path\n\n#read_financial_posting_table.repartition(200).write.option(\"partitionOverwriteMode\",\"dynamic\").partitionBy(\"edi_business_day\").mode(\"${S3fileWriteMode}\").format(\"${fileWriteFormat}\").save(full_bucket_path)\n\noutput = read_financial_posting_table"
+      },
+      {
+        "name": "Trash_2",
+        "transformation": "Writer",
+        "dependent_on": [
+          "Get_Agreements"
+        ],
+        "target": {
+          "$ref": "#/targets/Trash_2"
+        },
+        "description": "Placeholder Writer for StreamSets null/trash destination 'com_streamsets_pipeline_spark_destination_dev_NullDTarget'. Replace with the real target."
+      }
+    ],
+    "engine_config": {
+      "engine_type": "pyspark",
+      "configurations": [
+        {
+          "property_name": "spark.driver.memory",
+          "property_value": "1G",
+          "section": "Application Properties",
+          "property_type": "String"
+        },
+        {
+          "property_name": "spark.driver.cores",
+          "property_value": "1",
+          "section": "Application Properties",
+          "property_type": "Integer"
+        },
+        {
+          "property_name": "spark.executor.memory",
+          "property_value": "15G",
+          "section": "Application Properties",
+          "property_type": "String"
+        },
+        {
+          "property_name": "spark.executor.cores",
+          "property_value": "4",
+          "section": "Application Properties",
+          "property_type": "Integer"
+        },
+        {
+          "property_name": "spark.dynamicAllocation.enabled",
+          "property_value": "true",
+          "section": "Dynamic Allocation",
+          "property_type": "Boolean"
+        },
+        {
+          "property_name": "spark.shuffle.service.enabled",
+          "property_value": "true",
+          "section": "Shuffle Behavior",
+          "property_type": "Boolean"
+        },
+        {
+          "property_name": "spark.dynamicAllocation.minExecutors",
+          "property_value": "3",
+          "section": "Dynamic Allocation",
+          "property_type": "Integer"
+        },
+        {
+          "property_name": "spark.sql.sources.partitionOverwriteMode",
+          "property_value": "dynamic",
+          "section": "Spark SQL",
+          "property_type": "String"
+        },
+        {
+          "property_name": "spark.driver.maxResultSize",
+          "property_value": "10G",
+          "section": "Application Properties",
+          "property_type": "String"
+        },
+        {
+          "property_name": "spark.dynamicAllocation.maxExecutors",
+          "property_value": "10",
+          "section": "Dynamic Allocation",
+          "property_type": "Integer"
+        },
+        {
+          "property_name": "spark.sql.shuffle.partitions",
+          "property_value": "200",
+          "section": "Spark SQL",
+          "property_type": "Integer"
+        },
+        {
+          "property_name": "spark.sql.parquet.output.committer.class",
+          "property_value": "org.apache.parquet.hadoop.ParquetOutputCommitter",
+          "section": "Spark SQL",
+          "property_type": "String"
+        },
+        {
+          "property_name": "spark.sql.sources.commitProtocolClass",
+          "property_value": "org.apache.spark.sql.execution.datasources.SQLHadoopMapReduceCommitProtocol",
+          "section": "Spark SQL",
+          "property_type": "String"
+        },
+        {
+          "property_name": "spark.sql.autoBroadcastJoinThreshold",
+          "property_value": "31457280",
+          "section": "Spark SQL",
+          "property_type": "Integer"
+        }
+      ]
+    },
+    "conversion_notes": [
+      "Origin 'Dev Random 1' (com_streamsets_pipeline_spark_origin_dev_DevRandomDOrigin) is a StreamSets dev/test origin; emitted a placeholder Relational source \u2014 set the real connection/table.",
+      "Destination 'Trash 2' (com_streamsets_pipeline_spark_destination_dev_NullDTarget) is a StreamSets null/trash target; emitted a placeholder Relational target \u2014 set the real connection/table.",
+      "StreamSets cluster/compute settings (Databricks/EMR) preserved under source_metadata.cluster_settings; map these to a BigHammer compute config (engine_config only carries Spark properties)."
+    ],
+    "source_metadata": {
+      "origin": "streamsets-transformer",
+      "streamsets_pipeline_id": "PFFCHVSGetAgreementsBBcopycd604308-b1bf-4078-bde1-1d25136bd4a4",
+      "streamsets_uuid": "0af219e5-aff6-4200-b5ba-39278ed99f7c",
+      "streamsets_title": "terry_transformer_test",
+      "execution_mode": "BATCH",
+      "cluster_settings": {
+        "executionMode": "BATCH",
+        "workerCount": 0,
+        "clusterSlaveMemory": 2048,
+        "clusterSlaveJavaOpts": "-XX:+UseConcMarkSweepGC -XX:+UseParNewGC -Dlog4j.debug",
+        "clusterConfig.clusterType": "DATABRICKS",
+        "clusterConfig.sparkMasterUrl": "local[*]",
+        "clusterConfig.deployMode": "CLIENT",
+        "clusterConfig.sparkAppName": "${pipeline:title()}",
+        "clusterConfig.stagingDir": "/streamsets",
+        "clusterConfig.useYarnKerberosKeytab": false,
+        "clusterConfig.yarnKerberosKeytabSource": "PROPERTIES_FILE",
+        "clusterConfig.yarnKerberosPrincipal": "name@DOMAIN",
+        "databricksConfig.baseUrl": "dsfersdfgweds",
+        "databricksConfig.credentialType": "TOKEN",
+        "databricksConfig.provisionNewCluster": true,
+        "databricksConfig.clusterConfig": "{\n    \"num_workers\": 8,\n    \"spark_version\": \"5.3.x-scala2.11\",\n    \"node_type_id\": \"i3.xlarge\"\n}",
+        "databricksConfig.terminateCluster": false,
+        "transformerEmrConnection.region": "EU_WEST_1",
+        "transformerEmrConnection.instanceCount": 2,
+        "clusterConfig.dataCacheLevel": "MEMORY_AND_DISK",
+        "clusterConfig.dataCacheReplicas": 1
+      }
+    }
+  },
+  "pipeline_type": "design",
+  "engine_type": "pyspark",
+  "total_test_scenario": null,
+  "passed_test": null,
+  "failed_test": null,
+  "sme_recommendations_count": null,
+  "process_status": null,
+  "pipeline_parameters": [
+    {
+      "created_at": "2026-06-25T21:23:25.758816Z",
+      "updated_at": "2026-06-25T21:23:25.758816Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 251,
+      "pipeline_id": 15,
+      "parameter_name": "bucket",
+      "parameter_value": "test",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:25.806163Z",
+      "updated_at": "2026-06-25T21:23:25.806163Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 252,
+      "pipeline_id": 15,
+      "parameter_name": "bucketPath",
+      "parameter_value": "bde/fraud/hvs/model_inference_bb/",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:25.854736Z",
+      "updated_at": "2026-06-25T21:23:25.854736Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 253,
+      "pipeline_id": 15,
+      "parameter_name": "fileWriteFormat",
+      "parameter_value": "parquet",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:25.889760Z",
+      "updated_at": "2026-06-25T21:23:25.889760Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 254,
+      "pipeline_id": 15,
+      "parameter_name": "hist_execution_date",
+      "parameter_value": "2023-02-02",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:25.924662Z",
+      "updated_at": "2026-06-25T21:23:25.924662Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 255,
+      "pipeline_id": 15,
+      "parameter_name": "jdbcReadParallelism",
+      "parameter_value": "1",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:25.962103Z",
+      "updated_at": "2026-06-25T21:23:25.962103Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 256,
+      "pipeline_id": 15,
+      "parameter_name": "reportingLag",
+      "parameter_value": "1",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.000257Z",
+      "updated_at": "2026-06-25T21:23:26.000257Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 257,
+      "pipeline_id": 15,
+      "parameter_name": "S3fileWriteMode",
+      "parameter_value": "overwrite",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.042174Z",
+      "updated_at": "2026-06-25T21:23:26.042174Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 258,
+      "pipeline_id": 15,
+      "parameter_name": "sfDatabase",
+      "parameter_value": "ENT_PRD",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.098746Z",
+      "updated_at": "2026-06-25T21:23:26.098746Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 259,
+      "pipeline_id": 15,
+      "parameter_name": "sfJDBCURL",
+      "parameter_value": "jdbc:snowflake://natwestgroup.eu-west-1.privatelink.snowflakecomputing.com/",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.146796Z",
+      "updated_at": "2026-06-25T21:23:26.146796Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 260,
+      "pipeline_id": 15,
+      "parameter_name": "sfPassword",
+      "parameter_value": "sf_password",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.194172Z",
+      "updated_at": "2026-06-25T21:23:26.194172Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 261,
+      "pipeline_id": 15,
+      "parameter_name": "sfRole",
+      "parameter_value": "FSA_DEV_FRAUD_ACC_FULL",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.232114Z",
+      "updated_at": "2026-06-25T21:23:26.232114Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 262,
+      "pipeline_id": 15,
+      "parameter_name": "sfSchema",
+      "parameter_value": "TIER1_PRS",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.269112Z",
+      "updated_at": "2026-06-25T21:23:26.269112Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 263,
+      "pipeline_id": 15,
+      "parameter_name": "sfTargetTable",
+      "parameter_value": "EVENT_FINANCIAL_MTA",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.303489Z",
+      "updated_at": "2026-06-25T21:23:26.303489Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 264,
+      "pipeline_id": 15,
+      "parameter_name": "sfURL",
+      "parameter_value": "test_url",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.350616Z",
+      "updated_at": "2026-06-25T21:23:26.350616Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 265,
+      "pipeline_id": 15,
+      "parameter_name": "sfUser",
+      "parameter_value": "sf_user",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.385777Z",
+      "updated_at": "2026-06-25T21:23:26.385777Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 266,
+      "pipeline_id": 15,
+      "parameter_name": "sfWarehouse",
+      "parameter_value": "FSA_DEV_FRAUD_QUERY",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.435880Z",
+      "updated_at": "2026-06-25T21:23:26.435880Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 267,
+      "pipeline_id": 15,
+      "parameter_name": "spark.driver.cores",
+      "parameter_value": "1",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.477251Z",
+      "updated_at": "2026-06-25T21:23:26.477251Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 268,
+      "pipeline_id": 15,
+      "parameter_name": "spark.driver.maxResultSize",
+      "parameter_value": "10G",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.514526Z",
+      "updated_at": "2026-06-25T21:23:26.514526Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 269,
+      "pipeline_id": 15,
+      "parameter_name": "spark.driver.memory",
+      "parameter_value": "1G",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.553598Z",
+      "updated_at": "2026-06-25T21:23:26.553598Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 270,
+      "pipeline_id": 15,
+      "parameter_name": "spark.dynamicAllocation.enabled",
+      "parameter_value": "true",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.590151Z",
+      "updated_at": "2026-06-25T21:23:26.590151Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 271,
+      "pipeline_id": 15,
+      "parameter_name": "spark.dynamicAllocation.maxExecutors",
+      "parameter_value": "10",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.631226Z",
+      "updated_at": "2026-06-25T21:23:26.631226Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 272,
+      "pipeline_id": 15,
+      "parameter_name": "spark.dynamicAllocation.minExecutors",
+      "parameter_value": "3",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.666978Z",
+      "updated_at": "2026-06-25T21:23:26.666978Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 273,
+      "pipeline_id": 15,
+      "parameter_name": "spark.executor.cores",
+      "parameter_value": "4",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.719373Z",
+      "updated_at": "2026-06-25T21:23:26.719373Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 274,
+      "pipeline_id": 15,
+      "parameter_name": "spark.executor.memory",
+      "parameter_value": "15G",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.774580Z",
+      "updated_at": "2026-06-25T21:23:26.774580Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 275,
+      "pipeline_id": 15,
+      "parameter_name": "spark.shuffle.service.enabled",
+      "parameter_value": "true",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.817614Z",
+      "updated_at": "2026-06-25T21:23:26.817614Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 276,
+      "pipeline_id": 15,
+      "parameter_name": "spark.sql.autoBroadcastJoinThreshold",
+      "parameter_value": "31457280",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.858868Z",
+      "updated_at": "2026-06-25T21:23:26.858868Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 277,
+      "pipeline_id": 15,
+      "parameter_name": "spark.sql.parquet.output.committer.class",
+      "parameter_value": "org.apache.parquet.hadoop.ParquetOutputCommitter",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.902695Z",
+      "updated_at": "2026-06-25T21:23:26.902695Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 278,
+      "pipeline_id": 15,
+      "parameter_name": "spark.sql.shuffle.partitions",
+      "parameter_value": "200",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.944599Z",
+      "updated_at": "2026-06-25T21:23:26.944599Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 279,
+      "pipeline_id": 15,
+      "parameter_name": "spark.sql.sources.commitProtocolClass",
+      "parameter_value": "org.apache.spark.sql.execution.datasources.SQLHadoopMapReduceCommitProtocol",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:26.978372Z",
+      "updated_at": "2026-06-25T21:23:26.978372Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 280,
+      "pipeline_id": 15,
+      "parameter_name": "spark.sql.sources.partitionOverwriteMode",
+      "parameter_value": "dynamic",
+      "parameter_type": "ENGINE_CONFIGURATION",
+      "tenant_id": 1
+    },
+    {
+      "created_at": "2026-06-25T21:23:27.026575Z",
+      "updated_at": "2026-06-25T21:23:27.026575Z",
+      "created_by": "admin",
+      "updated_by": "admin",
+      "is_deleted": false,
+      "deleted_by": null,
+      "pipeline_parameter_id": 281,
+      "pipeline_id": 15,
+      "parameter_name": "use_hist_execution_date",
+      "parameter_value": "Y",
+      "parameter_type": "USER",
+      "tenant_id": 1
+    }
+  ]
+}
